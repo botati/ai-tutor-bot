@@ -324,7 +324,7 @@ func (h *Handler) handleCallback(callback *tgbotapi.CallbackQuery) {
 	case "feedback:positive":
 		h.statsStorage.TrackFeedback(chatID, "positive")
 		h.answerCallback(callback.ID, "Спасибо за оценку 👍")
-		h.removeFeedbackButtons(
+		h.replaceFeedbackButtons(
 			callback.Message.Chat.ID,
 			callback.Message.MessageID,
 		)
@@ -332,10 +332,12 @@ func (h *Handler) handleCallback(callback *tgbotapi.CallbackQuery) {
 	case "feedback:negative":
 		h.statsStorage.TrackFeedback(chatID, "negative")
 		h.answerCallback(callback.ID, "Спасибо! Я учту это 👎")
-		h.removeFeedbackButtons(
+		h.replaceFeedbackButtons(
 			callback.Message.Chat.ID,
 			callback.Message.MessageID,
 		)
+	case "feedback:already":
+		h.answerCallback(callback.ID, "Отзыв уже принят ✅")
 
 	default:
 		h.answerCallback(callback.ID, "Неизвестное действие")
@@ -350,22 +352,16 @@ func (h *Handler) answerCallback(callbackID string, text string) {
 	}
 }
 
-func (h *Handler) removeFeedbackButtons(
-	chatID int64,
-	messageID int,
-) {
-	edit := tgbotapi.NewEditMessageReplyMarkup(
-		chatID,
-		messageID,
-		tgbotapi.InlineKeyboardMarkup{},
+func (h *Handler) replaceFeedbackButtons(chatID int64, messageID int) {
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("✅ Спасибо за отзыв", "feedback:already"),
+		),
 	)
 
+	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, messageID, keyboard)
+
 	if _, err := h.api.Request(edit); err != nil {
-		h.logger.Error(
-			"failed to remove feedback buttons",
-			"chat_id", chatID,
-			"message_id", messageID,
-			"error", err,
-		)
+		h.logger.Error("failed to replace feedback buttons", "error", err)
 	}
 }
