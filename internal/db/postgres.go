@@ -1,0 +1,25 @@
+package db
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func NewPostgres(ctx context.Context, dsn string, logger *slog.Logger) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		return nil, fmt.Errorf("create postgres pool: %w", err)
+	}
+
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping postgres: %w", err)
+	}
+
+	logger.Info("connected to postgres")
+
+	return pool, nil
+}
