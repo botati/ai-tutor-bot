@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cobrich/ai-tutor-bot/internal/entity"
+	"github.com/cobrich/ai-tutor-bot/internal/metrics"
 )
 
 type GeminiClient struct {
@@ -78,8 +79,11 @@ func (c *GeminiClient) DetectSubject(
 		},
 	}
 
+	metrics.AIRequestsTotal.WithLabelValues("gemini", "classifier").Inc()
+
 	result, err := c.sendGenerateContent(ctx, reqBody)
 	if err != nil {
+		metrics.AIErrorsTotal.WithLabelValues("gemini", "classifier").Inc()
 		return entity.SubjectUnknown, err
 	}
 
@@ -126,6 +130,8 @@ func (c *GeminiClient) AskText(ctx context.Context, question string, history []e
 
 	prompt := GetSubjectPrompt(subject)
 
+	metrics.AIRequestsTotal.WithLabelValues("gemini", "text").Inc()
+
 	reqBody := geminiRequest{
 		SystemInstruction: &geminiContent{
 			Parts: []geminiPart{
@@ -135,7 +141,13 @@ func (c *GeminiClient) AskText(ctx context.Context, question string, history []e
 		Contents: contents,
 	}
 
-	return c.sendGenerateContent(ctx, reqBody)
+	answer, err := c.sendGenerateContent(ctx, reqBody)
+	if err != nil {
+		metrics.AIErrorsTotal.WithLabelValues("gemini", "text").Inc()
+		return "", err
+	}
+
+	return answer, nil
 }
 
 func (c *GeminiClient) AskWithImage(ctx context.Context, question string, image []byte, mimeType string) (string, error) {
@@ -154,6 +166,8 @@ func (c *GeminiClient) AskWithImage(ctx context.Context, question string, image 
 	if question == "" {
 		question = "Распознай задачу на картинке и объясни решение простыми словами."
 	}
+
+	metrics.AIRequestsTotal.WithLabelValues("gemini", "image").Inc()
 
 	reqBody := geminiRequest{
 		SystemInstruction: &geminiContent{
@@ -177,7 +191,13 @@ func (c *GeminiClient) AskWithImage(ctx context.Context, question string, image 
 		},
 	}
 
-	return c.sendGenerateContent(ctx, reqBody)
+	answer, err := c.sendGenerateContent(ctx, reqBody)
+	if err != nil {
+		metrics.AIErrorsTotal.WithLabelValues("gemini", "image").Inc()
+		return "", err
+	}
+
+	return answer, nil
 }
 
 func (c *GeminiClient) buildContents(question string, history []entity.Message) []geminiContent {
@@ -244,9 +264,9 @@ func (c *GeminiClient) sendGenerateContent(ctx context.Context, reqBody geminiRe
 			"gemini request failed",
 			"status", resp.StatusCode,
 			"message", result.Error.Message,
-			"duration_ms", time.Since(start).Microseconds(),
+			"duration_ms", time.Since(start).Milliseconds(),
 		)
-		
+
 		return "", fmt.Errorf("gemini error: status=%d message=%s", resp.StatusCode, result.Error.Message)
 	}
 
@@ -254,9 +274,9 @@ func (c *GeminiClient) sendGenerateContent(ctx context.Context, reqBody geminiRe
 		for _, part := range candidate.Content.Parts {
 			if part.Text != "" {
 				c.logger.Info(
-					"gemini request complited",
+					"gemini request completed",
 					"model", c.model,
-					"duration_ms", time.Since(start).Microseconds(),
+					"duration_ms", time.Since(start).Milliseconds(),
 				)
 
 				return part.Text, nil

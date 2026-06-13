@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cobrich/ai-tutor-bot/internal/metrics"
 	"github.com/cobrich/ai-tutor-bot/internal/service"
 	"github.com/cobrich/ai-tutor-bot/internal/stats"
 	"github.com/cobrich/ai-tutor-bot/utils"
@@ -68,6 +69,8 @@ func (h *Handler) Handle(update tgbotapi.Update) {
 }
 
 func (h *Handler) handleCommand(message *tgbotapi.Message) {
+	metrics.TelegramRequestsTotal.WithLabelValues("command").Inc()
+
 	chatID := message.Chat.ID
 
 	switch message.Command() {
@@ -116,6 +119,8 @@ func (h *Handler) handleCommand(message *tgbotapi.Message) {
 }
 
 func (h *Handler) handleText(chatID int64, text string) {
+	metrics.TelegramRequestsTotal.WithLabelValues("text").Inc()
+
 	cleanText := strings.TrimSpace(text)
 
 	if cleanText == "" {
@@ -146,6 +151,8 @@ func (h *Handler) handleText(chatID int64, text string) {
 }
 
 func (h *Handler) handlePhoto(message *tgbotapi.Message) {
+	metrics.TelegramRequestsTotal.WithLabelValues("photo").Inc()
+
 	chatID := message.Chat.ID
 
 	h.sendChatAction(chatID, tgbotapi.ChatUploadPhoto)
@@ -185,6 +192,8 @@ func (h *Handler) handlePhoto(message *tgbotapi.Message) {
 }
 
 func (h *Handler) handleVoice(message *tgbotapi.Message) {
+	metrics.TelegramRequestsTotal.WithLabelValues("voice").Inc()
+
 	chatID := message.Chat.ID
 
 	h.sendChatAction(chatID, tgbotapi.ChatTyping)

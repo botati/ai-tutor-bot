@@ -13,6 +13,7 @@ import (
 	"github.com/cobrich/ai-tutor-bot/internal/db"
 	"github.com/cobrich/ai-tutor-bot/internal/httpserver"
 	"github.com/cobrich/ai-tutor-bot/internal/limiter"
+	"github.com/cobrich/ai-tutor-bot/internal/metrics"
 	"github.com/cobrich/ai-tutor-bot/internal/service"
 	"github.com/cobrich/ai-tutor-bot/internal/stats"
 	"github.com/cobrich/ai-tutor-bot/internal/storage"
@@ -24,6 +25,8 @@ func Run() {
 	cfg := config.Load()
 
 	logger := logger.New(cfg.AppEnv)
+
+	metrics.Register()
 
 	if cfg.TelegramBotToken == "" {
 		logger.Error("TELEGRAM_BOT_TOKEN is required")
