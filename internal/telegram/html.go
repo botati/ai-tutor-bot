@@ -1,7 +1,7 @@
 package telegram
 
-import "html"
+// import "html"
 
-func escapeHTML(text string) string {
-	return html.EscapeString(text)
-}
+// func escapeHTML(text string) string {
+// 	return html.EscapeString(text)
+// }

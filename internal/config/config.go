@@ -9,13 +9,23 @@ import (
 )
 
 type Config struct {
-	TelegramBotToken      string
+	AppEnv string
+
+	HTTPPort string
+
+	PostgresDSN string
+
+	TelegramBotToken string
+	AdminTelegramID  int64
+
+	AIProvider string
+
+	GeminiAPIKey string
+	GeminiModel  string
+
 	OpenAIAPIKey          string
 	OpenAIModel           string
 	OpenAITranscribeModel string
-	AppEnv                string
-	AdminTelegramID       int64
-	PostgresDSN           string
 }
 
 func Load() Config {
@@ -24,13 +34,23 @@ func Load() Config {
 	}
 
 	return Config{
-		TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),
+		AppEnv: getEnv("APP_ENV", "local"),
+
+		HTTPPort: getEnv("HTTP_PORT", "8082"),
+
+		PostgresDSN: buildPostgresDSN(),
+
+		TelegramBotToken: getEnv("TELEGRAM_BOT_TOKEN", ""),
+		AdminTelegramID:  getEnvInt64("ADMIN_TELEGRAM_ID", 0),
+
+		AIProvider: getEnv("AI_PROVIDER", "openai"),
+
+		GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
+		GeminiModel:  getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
+
 		OpenAIAPIKey:          getEnv("OPENAI_API_KEY", ""),
 		OpenAIModel:           getEnv("OPENAI_MODEL", "gpt-4.1-mini"),
 		OpenAITranscribeModel: getEnv("OPENAI_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe"),
-		AppEnv:                getEnv("APP_ENV", "local"),
-		AdminTelegramID:       getEnvInt64("ADMIN_TELEGRAM_ID", 0),
-		PostgresDSN:           buildPostgresDSN(),
 	}
 }
 

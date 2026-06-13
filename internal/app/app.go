@@ -6,10 +6,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/cobrich/ai-tutor-bot/internal/ai"
 	"github.com/cobrich/ai-tutor-bot/internal/config"
 	"github.com/cobrich/ai-tutor-bot/internal/db"
+	"github.com/cobrich/ai-tutor-bot/internal/httpserver"
 	"github.com/cobrich/ai-tutor-bot/internal/limiter"
 	"github.com/cobrich/ai-tutor-bot/internal/service"
 	"github.com/cobrich/ai-tutor-bot/internal/stats"
@@ -47,20 +49,33 @@ func Run() {
 	}
 	defer pool.Close()
 
-	aiClient := ai.NewOpenAIClient(
-		cfg.OpenAIAPIKey,
-		cfg.OpenAIModel,
-		cfg.OpenAITranscribeModel,
-	)
+	// aiClient := ai.NewOpenAIClient(
+	// 	cfg.OpenAIAPIKey,
+	// 	cfg.OpenAIModel,
+	// 	cfg.OpenAITranscribeModel,
+	// )
 
 	historyStorage := storage.NewPostgresHistoryStorage(pool, logger)
 	rateLimiter := limiter.NewPostgresRateLimiter(pool, 20, logger)
 	statsStorage := stats.NewPostgresStatsStorage(pool, logger)
-	tutorService := service.NewTutorService(aiClient, historyStorage, rateLimiter)
 
+	llm, err := ai.NewLLM(cfg, logger)
+	if err != nil {
+		logger.Error("failed to get llm", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	transcriber, err := ai.NewTranscriber(cfg)
+	if err != nil {
+		logger.Error("failed to create transcriber", "error", err)
+		os.Exit(1)
+	}
+
+	tutorService := service.NewTutorService(llm, transcriber, historyStorage, rateLimiter)
 	bot, err := telegram.NewBot(
 		cfg.TelegramBotToken,
 		tutorService,
+
 		logger,
 		cfg.AdminTelegramID,
 		statsStorage,
@@ -70,7 +85,17 @@ func Run() {
 		os.Exit(1)
 	}
 
+	healthServer := httpserver.New(cfg.HTTPPort, pool, logger)
+	go healthServer.Start()
+
 	bot.Start(ctx)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := healthServer.Shutdown(shutdownCtx); err != nil {
+		logger.Error("failed to shutdown http server", "error", err)
+	}
 
 	logger.Info("application stopped")
 }

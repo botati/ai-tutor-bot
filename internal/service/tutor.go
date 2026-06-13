@@ -12,18 +12,22 @@ import (
 )
 
 type TutorService struct {
-	aiClient    ai.Client
+	llm         ai.LLM
+	transcriber ai.Transcriber
+
 	history     storage.HistoryStorage
 	rateLimiter limiter.RateLimiter
 }
 
 func NewTutorService(
-	aiClient ai.Client,
+	llm ai.LLM,
+	transcriber ai.Transcriber,
 	history storage.HistoryStorage,
 	rateLimiter limiter.RateLimiter,
 ) *TutorService {
 	return &TutorService{
-		aiClient:    aiClient,
+		llm:         llm,
+		transcriber: transcriber,
 		history:     history,
 		rateLimiter: rateLimiter,
 	}
@@ -39,9 +43,13 @@ func (s *TutorService) AnswerText(ctx context.Context, chatID int64, question st
 		return "Напиши вопрос текстом 🙂", nil
 	}
 
+	if len([]rune(question)) > MaxQuestionLength {
+		return "Вопрос слишком длинный 😅\n\nПожалуйста, сократи его до 5000 символов или отправь только саму задачу.", nil
+	}
+
 	recentHistory := s.history.GetRecent(chatID, 10)
 
-	answer, err := s.aiClient.AskText(ctx, question, recentHistory)
+	answer, err := s.llm.AskText(ctx, question, recentHistory)
 	if err != nil {
 		return "", fmt.Errorf("failed to answer text: %w", err)
 	}
@@ -66,7 +74,11 @@ func (s *TutorService) AnswerImage(ctx context.Context, chatID int64, caption st
 
 	caption = strings.TrimSpace(caption)
 
-	answer, err := s.aiClient.AskWithImage(ctx, caption, image, mimeType)
+	if len([]rune(caption)) > MaxQuestionLength {
+		return "Подпись к фото слишком длинная 😅\n\nПожалуйста, отправь фото с коротким вопросом.", nil
+	}
+
+	answer, err := s.llm.AskWithImage(ctx, caption, image, mimeType)
 	if err != nil {
 		return "", fmt.Errorf("failed to answer image: %w", err)
 	}
@@ -90,9 +102,13 @@ func (s *TutorService) AnswerImage(ctx context.Context, chatID int64, caption st
 }
 
 func (s *TutorService) AnswerVoice(ctx context.Context, chatID int64, audio []byte, filename string) (string, string, error) {
-	transcript, err := s.aiClient.TranscribeAudio(ctx, audio, filename)
+	transcript, err := s.transcriber.TranscribeAudio(ctx, audio, filename)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to transcribe voice: %w", err)
+	}
+
+	if len([]rune(transcript)) > MaxQuestionLength {
+		return transcript, "Голосовое получилось слишком длинным 😅\n\nПожалуйста, задай вопрос короче.", nil
 	}
 
 	// s.stats.TrackVoiceRequest(chatID)

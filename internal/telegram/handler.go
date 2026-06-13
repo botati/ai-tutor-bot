@@ -145,28 +145,6 @@ func (h *Handler) handleText(chatID int64, text string) {
 	h.sendMessage(chatID, answer)
 }
 
-func (h *Handler) sendMessage(chatID int64, text string) {
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ParseMode = "HTML"
-
-	if _, err := h.api.Send(msg); err != nil {
-		h.logger.Error(
-			"failed to send html message",
-			"chat_id", chatID,
-			"error", err,
-		)
-
-		plainMsg := tgbotapi.NewMessage(chatID, text)
-		if _, err := h.api.Send(plainMsg); err != nil {
-			h.logger.Error(
-				"failed to send html message",
-				"chat_id", chatID,
-				"error", err,
-			)
-		}
-	}
-}
-
 func (h *Handler) handlePhoto(message *tgbotapi.Message) {
 	chatID := message.Chat.ID
 
@@ -175,7 +153,7 @@ func (h *Handler) handlePhoto(message *tgbotapi.Message) {
 	photos := message.Photo
 	bestPhoto := photos[len(photos)-1]
 
-	image, mimeType, err := h.downloadTelegramFile(bestPhoto.FileID)
+	image, mimeType, err := h.downloadTelegramFile(bestPhoto.FileID, MaxTelegramPhotoSizeBytes)
 	if err != nil {
 		h.logger.Error(
 			"failed to download photo",
@@ -183,7 +161,7 @@ func (h *Handler) handlePhoto(message *tgbotapi.Message) {
 			"error", err,
 		)
 
-		h.sendMessage(chatID, "Не получилось скачать фото 😔 Попробуй отправить ещё раз.")
+		h.sendMessage(chatID, "Не получилось скачать фото 😔\n\nПроверь, что фото не слишком большое и попробуй ещё раз.")
 		return
 	}
 
@@ -211,14 +189,14 @@ func (h *Handler) handleVoice(message *tgbotapi.Message) {
 
 	h.sendChatAction(chatID, tgbotapi.ChatTyping)
 
-	audio, _, err := h.downloadTelegramFile(message.Voice.FileID)
+	audio, _, err := h.downloadTelegramFile(message.Voice.FileID, MaxTelegramVoiceSizeBytes)
 	if err != nil {
 		h.logger.Error(
 			"failed to download voice",
 			"chat_id", chatID,
 			"error", err,
 		)
-		h.sendMessage(chatID, "Не получилось скачать голосовое 😔 Попробуй ещё раз.")
+		h.sendMessage(chatID, "Не получилось скачать голосовое 😔\n\nПроверь, что оно не слишком длинное и попробуй ещё раз.")
 		return
 	}
 
@@ -238,21 +216,41 @@ func (h *Handler) handleVoice(message *tgbotapi.Message) {
 		return
 	}
 
-	response := "<b>Я услышал:</b>\n" +
-		"<i>" + escapeHTML(transcript) + "</i>\n\n" +
+	response := "🎧 Я услышал:\n" +
+		transcript + "\n\n" +
 		answer
 
 	h.sendMessage(chatID, response)
 }
 
 func (h *Handler) sendChatAction(chatID int64, action string) {
-	chatAction := tgbotapi.NewChatAction(chatID, action)
+	_, err := h.api.Request(
+		tgbotapi.NewChatAction(chatID, action),
+	)
 
-	if _, err := h.api.Send(chatAction); err != nil {
+	if err != nil {
 		h.logger.Error(
 			"failed to send chat action",
 			"chat_id", chatID,
 			"error", err,
 		)
+	}
+}
+
+func (h *Handler) sendMessage(chatID int64, text string) {
+	text = sanitizeAnswer(text)
+
+	parts := splitMessage(text)
+
+	for _, part := range parts {
+		msg := tgbotapi.NewMessage(chatID, part)
+
+		if _, err := h.api.Send(msg); err != nil {
+			h.logger.Error(
+				"failed to send message",
+				"chat_id", chatID,
+				"error", err,
+			)
+		}
 	}
 }

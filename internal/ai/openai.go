@@ -242,3 +242,13 @@ func (c *OpenAIClient) TranscribeAudio(ctx context.Context, audio []byte, filena
 
 	return result.Text, nil
 }
+
+func (c *OpenAIClient) DetectSubject(
+	ctx context.Context,
+	question string,
+	image []byte,
+	mimeType string,
+) (entity.Subject, error) {
+	var s entity.Subject
+	return s, nil
+}
