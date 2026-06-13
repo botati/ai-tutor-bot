@@ -324,10 +324,18 @@ func (h *Handler) handleCallback(callback *tgbotapi.CallbackQuery) {
 	case "feedback:positive":
 		h.statsStorage.TrackFeedback(chatID, "positive")
 		h.answerCallback(callback.ID, "Спасибо за оценку 👍")
+		h.removeFeedbackButtons(
+			callback.Message.Chat.ID,
+			callback.Message.MessageID,
+		)
 
 	case "feedback:negative":
 		h.statsStorage.TrackFeedback(chatID, "negative")
 		h.answerCallback(callback.ID, "Спасибо! Я учту это 👎")
+		h.removeFeedbackButtons(
+			callback.Message.Chat.ID,
+			callback.Message.MessageID,
+		)
 
 	default:
 		h.answerCallback(callback.ID, "Неизвестное действие")
@@ -339,5 +347,25 @@ func (h *Handler) answerCallback(callbackID string, text string) {
 
 	if _, err := h.api.Request(callback); err != nil {
 		h.logger.Error("failed to answer callback", "error", err)
+	}
+}
+
+func (h *Handler) removeFeedbackButtons(
+	chatID int64,
+	messageID int,
+) {
+	edit := tgbotapi.NewEditMessageReplyMarkup(
+		chatID,
+		messageID,
+		tgbotapi.InlineKeyboardMarkup{},
+	)
+
+	if _, err := h.api.Request(edit); err != nil {
+		h.logger.Error(
+			"failed to remove feedback buttons",
+			"chat_id", chatID,
+			"message_id", messageID,
+			"error", err,
+		)
 	}
 }
