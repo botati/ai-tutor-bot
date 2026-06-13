@@ -80,7 +80,7 @@ func (h *Handler) handleCommand(message *tgbotapi.Message) {
 		h.sendMessage(chatID, utils.HELP_TEXT)
 	case "reset":
 		h.tutorService.ResetHistory(chatID)
-		h.sendMessage(chatID, "История диалога очищена ✅ Можем начать заново.")
+		h.sendMessage(chatID, utils.RESET_TEXT)
 	case "limit":
 		remaining := h.tutorService.RemainingLimit(chatID)
 
@@ -110,6 +110,30 @@ func (h *Handler) handleCommand(message *tgbotapi.Message) {
 			snapshot.TextRequests,
 			snapshot.ImageRequests,
 			snapshot.VoiceRequests,
+		)
+
+		h.sendMessage(chatID, text)
+	case "profile":
+		profile := h.statsStorage.UserProfile(chatID)
+		remaining := h.tutorService.RemainingLimit(chatID)
+
+		text := fmt.Sprintf(
+			"👤 Профиль\n\n"+
+				"Осталось запросов сегодня: %d\n\n"+
+				"📊 Мои запросы:\n"+
+				"Всего: %d\n"+
+				"Текст: %d\n"+
+				"Фото: %d\n"+
+				"Голос: %d\n\n"+
+				"Дата регистрации: %s\n"+
+				"Последняя активность: %s",
+			remaining,
+			profile.TotalRequests,
+			profile.TextRequests,
+			profile.ImageRequests,
+			profile.VoiceRequests,
+			profile.CreatedAt,
+			profile.LastSeenAt,
 		)
 
 		h.sendMessage(chatID, text)
