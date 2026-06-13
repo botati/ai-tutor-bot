@@ -38,6 +38,11 @@ func NewHandler(
 	}
 }
 func (h *Handler) Handle(update tgbotapi.Update) {
+	if update.CallbackQuery != nil {
+		h.handleCallback(update.CallbackQuery)
+		return
+	}
+
 	if update.Message == nil {
 		return
 	}
@@ -104,12 +109,16 @@ func (h *Handler) handleCommand(message *tgbotapi.Message) {
 				"Всего запросов: <b>%d</b>\n"+
 				"Текстовые: <b>%d</b>\n"+
 				"Фото: <b>%d</b>\n"+
-				"Голосовые: <b>%d</b>",
+				"Голосовые: <b>%d</b>\n"+
+				"👍 Полезно: %d\n"+
+				"👎 Не помогло: %d\n",
 			snapshot.Users,
 			snapshot.TotalRequests,
 			snapshot.TextRequests,
 			snapshot.ImageRequests,
 			snapshot.VoiceRequests,
+			snapshot.PositiveFeedback,
+			snapshot.NegativeFeedback,
 		)
 
 		h.sendMessage(chatID, text)
@@ -171,7 +180,7 @@ func (h *Handler) handleText(chatID int64, text string) {
 		return
 	}
 
-	h.sendMessage(chatID, answer)
+	h.sendMessageWithFeedback(chatID, answer)
 }
 
 func (h *Handler) handlePhoto(message *tgbotapi.Message) {
@@ -212,7 +221,7 @@ func (h *Handler) handlePhoto(message *tgbotapi.Message) {
 		return
 	}
 
-	h.sendMessage(chatID, answer)
+	h.sendMessageWithFeedback(chatID, answer)
 }
 
 func (h *Handler) handleVoice(message *tgbotapi.Message) {
@@ -285,5 +294,50 @@ func (h *Handler) sendMessage(chatID int64, text string) {
 				"error", err,
 			)
 		}
+	}
+}
+
+func (h *Handler) sendMessageWithFeedback(chatID int64, text string) {
+	text = sanitizeAnswer(text)
+
+	msg := tgbotapi.NewMessage(chatID, text)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("👍 Полезно", "feedback:positive"),
+			tgbotapi.NewInlineKeyboardButtonData("👎 Не помогло", "feedback:negative"),
+		),
+	)
+
+	msg.ReplyMarkup = keyboard
+
+	if _, err := h.api.Send(msg); err != nil {
+		h.logger.Error("failed to send message with feedback", "chat_id", chatID, "error", err)
+	}
+}
+
+func (h *Handler) handleCallback(callback *tgbotapi.CallbackQuery) {
+	chatID := callback.Message.Chat.ID
+	data := callback.Data
+
+	switch data {
+	case "feedback:positive":
+		h.statsStorage.TrackFeedback(chatID, "positive")
+		h.answerCallback(callback.ID, "Спасибо за оценку 👍")
+
+	case "feedback:negative":
+		h.statsStorage.TrackFeedback(chatID, "negative")
+		h.answerCallback(callback.ID, "Спасибо! Я учту это 👎")
+
+	default:
+		h.answerCallback(callback.ID, "Неизвестное действие")
+	}
+}
+
+func (h *Handler) answerCallback(callbackID string, text string) {
+	callback := tgbotapi.NewCallback(callbackID, text)
+
+	if _, err := h.api.Request(callback); err != nil {
+		h.logger.Error("failed to answer callback", "error", err)
 	}
 }

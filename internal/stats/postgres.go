@@ -120,12 +120,43 @@ func (s *PostgresStatsStorage) Snapshot() Snapshot {
 		values[key] = value
 	}
 
+	var positiveFeedback int
+	var negativeFeedback int
+
+	err = s.pool.QueryRow(
+		ctx,
+		`
+	SELECT COUNT(*)
+	FROM feedback
+	WHERE value = 'positive'
+	`,
+	).Scan(&positiveFeedback)
+
+	if err != nil {
+		s.logger.Error("failed to count positive feedback", "error", err)
+	}
+
+	err = s.pool.QueryRow(
+		ctx,
+		`
+	SELECT COUNT(*)
+	FROM feedback
+	WHERE value = 'negative'
+	`,
+	).Scan(&negativeFeedback)
+
+	if err != nil {
+		s.logger.Error("failed to count negative feedback", "error", err)
+	}
+
 	return Snapshot{
-		Users:         users,
-		TextRequests:  values["text_requests"],
-		ImageRequests: values["image_requests"],
-		VoiceRequests: values["voice_requests"],
-		TotalRequests: values["total_requests"],
+		Users:            users,
+		TextRequests:     values["text_requests"],
+		ImageRequests:    values["image_requests"],
+		VoiceRequests:    values["voice_requests"],
+		TotalRequests:    values["total_requests"],
+		PositiveFeedback: positiveFeedback,
+		NegativeFeedback: negativeFeedback,
 	}
 }
 
@@ -216,5 +247,33 @@ func (s *PostgresStatsStorage) incrementUserStat(chatID int64, column string) {
 
 	if _, err := s.pool.Exec(ctx, query, chatID); err != nil {
 		s.logger.Error("failed to increment user stat", "chat_id", chatID, "column", column, "error", err)
+	}
+}
+
+func (s *PostgresStatsStorage) TrackFeedback(chatID int64, value string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if value != "positive" && value != "negative" {
+		return
+	}
+
+	_, err := s.pool.Exec(
+		ctx,
+		`
+		INSERT INTO feedback (chat_id, value)
+		VALUES ($1, $2)
+		`,
+		chatID,
+		value,
+	)
+
+	if err != nil {
+		s.logger.Error(
+			"failed to track feedback",
+			"chat_id", chatID,
+			"value", value,
+			"error", err,
+		)
 	}
 }

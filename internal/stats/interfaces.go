@@ -7,14 +7,17 @@ type StatsStorage interface {
 	TrackVoiceRequest(chatID int64)
 	Snapshot() Snapshot
 	UserProfile(chatID int64) UserProfile
+	TrackFeedback(chatID int64, value string)
 }
 
 type Snapshot struct {
-	Users         int
-	TextRequests  int
-	ImageRequests int
-	VoiceRequests int
-	TotalRequests int
+	Users            int
+	TextRequests     int
+	ImageRequests    int
+	VoiceRequests    int
+	TotalRequests    int
+	PositiveFeedback int
+	NegativeFeedback int
 }
 
 type UserProfile struct {
