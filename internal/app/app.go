@@ -59,7 +59,7 @@ func Run() {
 	// )
 
 	historyStorage := storage.NewPostgresHistoryStorage(pool, logger)
-	rateLimiter := limiter.NewPostgresRateLimiter(pool, 20, logger)
+	rateLimiter := limiter.NewPostgresRateLimiter(pool, 100, logger)
 	statsStorage := stats.NewPostgresStatsStorage(pool, logger)
 
 	llm, err := ai.NewLLM(cfg, logger)

@@ -76,31 +76,34 @@ func (l *PostgresRateLimiter) Remaining(chatID int64) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	today := time.Now().Format("2006-01-02")
-
-	var count int
-	var lastReset time.Time
+	var remaining int
 
 	err := l.pool.QueryRow(
 		ctx,
 		`
-		SELECT request_count, last_reset
+		SELECT
+			CASE
+				WHEN last_reset < CURRENT_DATE THEN $2
+				ELSE GREATEST($2 - request_count, 0)
+			END
 		FROM user_limits
 		WHERE chat_id = $1
 		`,
 		chatID,
-	).Scan(&count, &lastReset)
+		l.limit,
+	).Scan(&remaining)
 
 	if err != nil {
-		return l.limit
-	}
+		if errors.Is(err, pgx.ErrNoRows) {
+			return l.limit
+		}
 
-	if lastReset.Format("2006-01-02") != today {
-		return l.limit
-	}
+		l.logger.Error(
+			"failed to get remaining limit",
+			"chat_id", chatID,
+			"error", err,
+		)
 
-	remaining := l.limit - count
-	if remaining < 0 {
 		return 0
 	}
 
