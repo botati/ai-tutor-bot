@@ -192,8 +192,8 @@ func (s *PostgresStatsStorage) UserProfile(chatID int64) UserProfile {
 		`
 		SELECT
 			u.chat_id,
-			u.created_at::text,
-			u.last_seen_at::text,
+			TO_CHAR(u.created_at + INTERVAL '5 hours', 'YYYY-MM-DD HH24:MI'),
+			TO_CHAR(u.last_seen_at + INTERVAL '5 hours', 'YYYY-MM-DD HH24:MI'),
 			COALESCE(st.text_requests, 0),
 			COALESCE(st.image_requests, 0),
 			COALESCE(st.voice_requests, 0)
