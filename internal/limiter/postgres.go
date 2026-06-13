@@ -2,9 +2,11 @@ package limiter
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -26,87 +28,44 @@ func (l *PostgresRateLimiter) Allow(chatID int64) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	today := time.Now().Format("2006-01-02")
-
-	tx, err := l.pool.Begin(ctx)
-	if err != nil {
-		l.logger.Error("failed to begin limiter tx", "chat_id", chatID, "error", err)
-		return false
-	}
-	defer tx.Rollback(ctx)
-
 	var count int
-	var lastReset time.Time
 
-	err = tx.QueryRow(
+	err := l.pool.QueryRow(
 		ctx,
 		`
-		SELECT request_count, last_reset
-		FROM user_limits
-		WHERE chat_id = $1
-		FOR UPDATE
-		`,
-		chatID,
-	).Scan(&count, &lastReset)
-
-	if err != nil {
-		_, err = tx.Exec(
-			ctx,
-			`
-			INSERT INTO user_limits (
-				chat_id,
-				request_count,
-				last_reset
-			)
-			VALUES ($1, 1, CURRENT_DATE)
-			`,
-			chatID,
+		INSERT INTO user_limits (
+			chat_id,
+			request_count,
+			last_reset
 		)
-		if err != nil {
-			l.logger.Error("failed to insert user limit", "chat_id", chatID, "error", err)
-			return false
-		}
-
-		if err := tx.Commit(ctx); err != nil {
-			l.logger.Error("failed to commit limiter tx", "chat_id", chatID, "error", err)
-			return false
-		}
-
-		return true
-	}
-
-	if lastReset.Format("2006-01-02") != today {
-		count = 0
-		lastReset = time.Now()
-	}
-
-	if count >= l.limit {
-		if err := tx.Commit(ctx); err != nil {
-			l.logger.Error("failed to commit limiter blocked", "chat_id", chatID, "error", err)
-		}
-		return false
-	}
-
-	count++
-
-	_, err = tx.Exec(
-		ctx,
-		`
-		UPDATE user_limits
-		SET request_count = $1,
-		    last_reset = CURRENT_DATE
-		WHERE chat_id = $2
+		VALUES ($1, 1, CURRENT_DATE)
+		ON CONFLICT (chat_id)
+		DO UPDATE SET
+			request_count = CASE
+				WHEN user_limits.last_reset < CURRENT_DATE THEN 1
+				ELSE user_limits.request_count + 1
+			END,
+			last_reset = CURRENT_DATE
+		WHERE
+			user_limits.last_reset < CURRENT_DATE
+			OR user_limits.request_count < $2
+		RETURNING request_count
 		`,
-		count,
 		chatID,
-	)
-	if err != nil {
-		l.logger.Error("failed to update user limit", "chat_id", chatID, "error", err)
-		return false
-	}
+		l.limit,
+	).Scan(&count)
 
-	if err := tx.Commit(ctx); err != nil {
-		l.logger.Error("failed to commit limiter update", "chat_id", chatID, "error", err)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false
+		}
+
+		l.logger.Error(
+			"failed to check rate limit",
+			"chat_id", chatID,
+			"error", err,
+		)
+
 		return false
 	}
 
