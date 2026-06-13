@@ -2,3 +2,11 @@
 .env
 tmp
 README.md
+.idea
+.vscode
+
+*.log
+
+docker-compose.yml
+
+README.md

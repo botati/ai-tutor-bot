@@ -77,8 +77,13 @@ func getEnvInt64(key string, fallback int64) int64 {
 }
 
 func buildPostgresDSN() string {
+	databaseURL := getEnv("DATABASE_URL", "")
+	if databaseURL != "" {
+		return databaseURL
+	}
+
 	host := getEnv("POSTGRES_HOST", "localhost")
-	port := getEnv("POSTGRES_PORT", "5432")
+	port := getEnv("POSTGRES_PORT", "5433")
 	db := getEnv("POSTGRES_DB", "ai_tutor_bot")
 	user := getEnv("POSTGRES_USER", "postgres")
 	password := getEnv("POSTGRES_PASSWORD", "postgres")
