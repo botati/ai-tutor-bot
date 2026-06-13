@@ -33,14 +33,6 @@ func Load() Config {
 		log.Println("No .env, using system env var-s")
 	}
 
-	token := os.Getenv("TELEGRAM_BOT_TOKEN")
-
-	log.Printf(
-		"DEBUG TELEGRAM_BOT_TOKEN exists=%v len=%d",
-		token != "",
-		len(token),
-	)
-
 	return Config{
 		AppEnv: getEnv("APP_ENV", "local"),
 
