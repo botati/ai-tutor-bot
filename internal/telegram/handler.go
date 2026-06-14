@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/cobrich/ai-tutor-bot/internal/access"
 	"github.com/cobrich/ai-tutor-bot/internal/metrics"
 	"github.com/cobrich/ai-tutor-bot/internal/service"
 	"github.com/cobrich/ai-tutor-bot/internal/stats"
@@ -20,6 +22,7 @@ type Handler struct {
 	logger          *slog.Logger
 	adminTelegramID int64
 	statsStorage    stats.StatsStorage
+	accessStorage   access.Storage
 }
 
 func NewHandler(
@@ -28,6 +31,7 @@ func NewHandler(
 	logger *slog.Logger,
 	adminTelegramID int64,
 	statsStorage stats.StatsStorage,
+	accessStorage access.Storage,
 ) *Handler {
 	return &Handler{
 		api:             api,
@@ -35,6 +39,7 @@ func NewHandler(
 		logger:          logger,
 		adminTelegramID: adminTelegramID,
 		statsStorage:    statsStorage,
+		accessStorage:   accessStorage,
 	}
 }
 func (h *Handler) Handle(update tgbotapi.Update) {
@@ -52,6 +57,11 @@ func (h *Handler) Handle(update tgbotapi.Update) {
 
 	if message.IsCommand() {
 		h.handleCommand(message)
+		return
+	}
+
+	if !h.isApproved(chatID) {
+		h.requestAccess(message)
 		return
 	}
 
@@ -80,7 +90,12 @@ func (h *Handler) handleCommand(message *tgbotapi.Message) {
 
 	switch message.Command() {
 	case "start":
-		h.sendMessage(chatID, utils.START_TEXT)
+		if h.isApproved(chatID) {
+			h.sendMessage(chatID, "Сәлем! AI Ustaz дайын ✅\n\nСұрағыңызды мәтін, фото немесе дауыспен жіберіңіз.")
+			return
+		}
+
+		h.requestAccess(message)
 	case "help":
 		h.sendMessage(chatID, utils.HELP_TEXT)
 	case "reset":
@@ -320,6 +335,11 @@ func (h *Handler) handleCallback(callback *tgbotapi.CallbackQuery) {
 	chatID := callback.Message.Chat.ID
 	data := callback.Data
 
+	if strings.HasPrefix(data, "access:") {
+		h.handleAccessCallback(callback)
+		return
+	}
+
 	switch data {
 	case "feedback:positive":
 		h.statsStorage.TrackFeedback(chatID, "positive")
@@ -363,5 +383,126 @@ func (h *Handler) replaceFeedbackButtons(chatID int64, messageID int) {
 
 	if _, err := h.api.Request(edit); err != nil {
 		h.logger.Error("failed to replace feedback buttons", "error", err)
+	}
+}
+
+func (h *Handler) isApproved(chatID int64) bool {
+	if chatID == h.adminTelegramID {
+		return true
+	}
+
+	status, ok := h.accessStorage.GetStatus(chatID)
+	return ok && status == access.StatusApproved
+}
+
+func (h *Handler) requestAccess(message *tgbotapi.Message) {
+	chatID := message.Chat.ID
+
+	status, ok := h.accessStorage.GetStatus(chatID)
+	if ok && status == access.StatusPending {
+		h.sendMessage(chatID, "Сіздің өтінішіңіз админге жіберілді. Рұқсат күтіңіз 🙂")
+		return
+	}
+
+	if ok && status == access.StatusRejected {
+		h.sendMessage(chatID, "Кешіріңіз, сізге ботты қолдануға рұқсат берілмеді.")
+		return
+	}
+
+	if err := h.accessStorage.RequestAccess(message.From); err != nil {
+		h.sendMessage(chatID, "Қате шықты. Кейінірек қайталап көріңіз.")
+		return
+	}
+
+	h.sendMessage(chatID, "Сіздің өтінішіңіз админге жіберілді. Рұқсат күтіңіз 🙂")
+	h.notifyAdminAboutAccessRequest(message.From)
+}
+
+func (h *Handler) notifyAdminAboutAccessRequest(user *tgbotapi.User) {
+	text := fmt.Sprintf(
+		"🔐 Жаңа қолданушы рұқсат сұрады\n\n"+
+			"ID: %d\n"+
+			"Username: @%s\n"+
+			"First name: %s\n"+
+			"Last name: %s",
+		user.ID,
+		user.UserName,
+		user.FirstName,
+		user.LastName,
+	)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("✅ Рұқсат беру", fmt.Sprintf("access:approve:%d", user.ID)),
+			tgbotapi.NewInlineKeyboardButtonData("❌ Қабылдамау", fmt.Sprintf("access:reject:%d", user.ID)),
+		),
+	)
+
+	msg := tgbotapi.NewMessage(h.adminTelegramID, text)
+	msg.ReplyMarkup = keyboard
+
+	if _, err := h.api.Send(msg); err != nil {
+		h.logger.Error("failed to notify admin about access request", "error", err)
+	}
+}
+
+func (h *Handler) handleAccessCallback(callback *tgbotapi.CallbackQuery) {
+	if callback.From.ID != h.adminTelegramID {
+		h.answerCallback(callback.ID, "Бұл әрекет тек админге арналған.")
+		return
+	}
+
+	parts := strings.Split(callback.Data, ":")
+	if len(parts) != 3 {
+		h.answerCallback(callback.ID, "Қате callback.")
+		return
+	}
+
+	action := parts[1]
+	userID, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		h.answerCallback(callback.ID, "Қате user ID.")
+		return
+	}
+
+	switch action {
+	case "approve":
+		if err := h.accessStorage.Approve(userID); err != nil {
+			h.answerCallback(callback.ID, "Қате шықты.")
+			return
+		}
+
+		h.answerCallback(callback.ID, "Қолданушыға рұқсат берілді ✅")
+		h.sendMessage(userID, "Сізге AI Ustaz қолдануға рұқсат берілді ✅\n\nЕнді сұрағыңызды жібере аласыз.")
+
+	case "reject":
+		if err := h.accessStorage.Reject(userID); err != nil {
+			h.answerCallback(callback.ID, "Қате шықты.")
+			return
+		}
+
+		h.answerCallback(callback.ID, "Қолданушы қабылданбады ❌")
+		h.sendMessage(userID, "Кешіріңіз, сізге AI Ustaz қолдануға рұқсат берілмеді.")
+	}
+
+	h.removeInlineKeyboard(callback.Message.Chat.ID, callback.Message.MessageID)
+}
+
+func (h *Handler) removeInlineKeyboard(chatID int64, messageID int) {
+	edit := tgbotapi.NewEditMessageReplyMarkup(
+		chatID,
+		messageID,
+		tgbotapi.InlineKeyboardMarkup{
+			InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{},
+		},
+	)
+
+	if _, err := h.api.Request(edit); err != nil {
+		h.logger.Error(
+			"failed to remove inline keyboard",
+			"chat_id", chatID,
+			"message_id", messageID,
+			"error", err,
+		)
 	}
 }

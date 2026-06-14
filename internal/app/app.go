@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cobrich/ai-tutor-bot/internal/access"
 	"github.com/cobrich/ai-tutor-bot/internal/ai"
 	"github.com/cobrich/ai-tutor-bot/internal/config"
 	"github.com/cobrich/ai-tutor-bot/internal/db"
@@ -61,6 +62,7 @@ func Run() {
 	historyStorage := storage.NewPostgresHistoryStorage(pool, logger)
 	rateLimiter := limiter.NewPostgresRateLimiter(pool, 100, logger)
 	statsStorage := stats.NewPostgresStatsStorage(pool, logger)
+	accessStorage := access.NewPostgresStorage(pool, logger)
 
 	llm, err := ai.NewLLM(cfg, logger)
 	if err != nil {
@@ -82,6 +84,7 @@ func Run() {
 		logger,
 		cfg.AdminTelegramID,
 		statsStorage,
+		accessStorage,
 	)
 	if err != nil {
 		logger.Error("failed to create telegram bot", slog.Any("error", err))

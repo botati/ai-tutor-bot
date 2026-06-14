@@ -4,15 +4,17 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/cobrich/ai-tutor-bot/internal/access"
 	"github.com/cobrich/ai-tutor-bot/internal/service"
 	"github.com/cobrich/ai-tutor-bot/internal/stats"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type Bot struct {
-	api     *tgbotapi.BotAPI
-	handler *Handler
-	logger  *slog.Logger
+	api           *tgbotapi.BotAPI
+	handler       *Handler
+	logger        *slog.Logger
+	accessStorage access.Storage
 }
 
 func NewBot(
@@ -21,6 +23,7 @@ func NewBot(
 	logger *slog.Logger,
 	adminTelegramID int64,
 	statsStorage stats.StatsStorage,
+	accessStorage access.Storage,
 ) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
@@ -30,9 +33,10 @@ func NewBot(
 	logger.Info("authorized on telegram", "username", api.Self.UserName)
 
 	return &Bot{
-		api:     api,
-		handler: NewHandler(api, tutorService, logger, adminTelegramID, statsStorage),
-		logger:  logger,
+		api:           api,
+		handler:       NewHandler(api, tutorService, logger, adminTelegramID, statsStorage, accessStorage),
+		logger:        logger,
+		accessStorage: accessStorage,
 	}, nil
 }
 
