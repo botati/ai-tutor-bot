@@ -90,12 +90,13 @@ func (h *Handler) handleCommand(message *tgbotapi.Message) {
 
 	switch message.Command() {
 	case "start":
-		if h.isApproved(chatID) {
-			h.sendMessage(chatID, "Сәлем! AI Ustaz дайын ✅\n\nСұрағыңызды мәтін, фото немесе дауыспен жіберіңіз.")
-			return
-		}
+		h.sendMessage(chatID, "Сәлем! AI Ustaz дайын ✅\n\nСұрағыңызды мәтін, фото немесе дауыспен жіберіңіз.")
+		// if h.isApproved(chatID) {
+		// 	h.sendMessage(chatID, "Сәлем! AI Ustaz дайын ✅\n\nСұрағыңызды мәтін, фото немесе дауыспен жіберіңіз.")
+		// 	return
+		// }
 
-		h.requestAccess(message)
+		// h.requestAccess(message)
 	case "help":
 		h.sendMessage(chatID, utils.HELP_TEXT)
 	case "reset":
