@@ -1,3 +1,6 @@
+![License](https://img.shields.io/github/license/cobrich/ai-tutor-bot)
+![Go Version](https://img.shields.io/github/go-mod/go-version/cobrich/ai-tutor-bot)
+![Last Commit](https://img.shields.io/github/last-commit/cobrich/ai-tutor-bot)
 <div align="center">
 
 <img src="docs/logo.png" width="220">
