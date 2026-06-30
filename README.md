@@ -339,3 +339,388 @@ Formatted Answer
 - ✅ Docker deployment
 - ✅ Railway deployment
 - ✅ Graceful shutdown
+  
+---
+
+# 🚀 Getting Started
+
+## Prerequisites
+
+- Go 1.24+
+- PostgreSQL 15+
+- Docker (optional)
+- Google Gemini API Key
+- OpenAI API Key
+- Telegram Bot Token
+
+---
+
+# ⚙ Configuration
+
+Create a `.env` file:
+
+```env
+APP_ENV=local
+
+HTTP_PORT=8082
+
+DATABASE_URL=postgres://postgres:password@localhost:5432/aiustaz?sslmode=disable
+
+TELEGRAM_BOT_TOKEN=
+
+ADMIN_TELEGRAM_ID=
+
+AI_PROVIDER=gemini
+
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+
+OPENAI_API_KEY=
+OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe
+```
+
+---
+
+# 🐳 Run with Docker
+
+Start PostgreSQL
+
+```bash
+docker compose up -d
+```
+
+Run migrations
+
+```bash
+make migrate
+```
+
+Start the bot
+
+```bash
+make run
+```
+
+---
+
+# 💻 Local Development
+
+Install dependencies
+
+```bash
+go mod download
+```
+
+Run migrations
+
+```bash
+go run ./cmd/migrate
+```
+
+Start bot
+
+```bash
+go run ./cmd/bot
+```
+
+---
+
+# 📋 Available Commands
+
+## User Commands
+
+| Command  | Description                |
+| -------- | -------------------------- |
+| /start   | Register user              |
+| /help    | Show help                  |
+| /profile | User profile               |
+| /limit   | Remaining daily requests   |
+| /reset   | Clear conversation history |
+
+---
+
+## Admin Commands
+
+| Command | Description    |
+| ------- | -------------- |
+| /stats  | Bot statistics |
+
+---
+
+# ❤️ Health Check
+
+```
+GET /health
+```
+
+Example response
+
+```json
+{
+    "status":"ok",
+    "database":"connected",
+    "version":"1.0.0"
+}
+```
+
+---
+
+# 📈 Metrics
+
+Prometheus endpoint
+
+```
+GET /metrics
+```
+
+Example metrics
+
+```
+telegram_requests_total
+
+telegram_users_total
+
+telegram_feedback_total
+
+telegram_ai_requests_total
+
+telegram_errors_total
+```
+
+---
+
+# 🔒 Security
+
+The project follows several production practices:
+
+- Environment variables for secrets
+- PostgreSQL parameterized queries
+- Daily request rate limiting
+- Graceful shutdown
+- Structured logging
+- Health monitoring
+- Conversation history isolation
+
+---
+
+# ⚡ Performance
+
+Production optimizations include:
+
+- PostgreSQL connection pooling
+- Embedded SQL migrations
+- Reusable AI client
+- Modular services
+- Lightweight HTTP server
+- Memory-efficient handlers
+- Split long Telegram messages
+- Markdown sanitization
+
+---
+
+# 🧪 Testing
+
+Run all tests
+
+```bash
+go test ./...
+```
+
+Run with coverage
+
+```bash
+go test ./... -cover
+```
+
+---
+
+# 🚢 Deployment
+
+The application is designed for cloud deployment.
+
+Tested with:
+
+- Railway
+- Docker
+- PostgreSQL
+- Prometheus
+
+Deployment flow
+
+```
+GitHub
+
+↓
+
+Railway
+
+↓
+
+Docker Container
+
+↓
+
+PostgreSQL
+
+↓
+
+Telegram Bot
+```
+
+---
+
+# 🔄 CI/CD Ready
+
+The project structure supports future integration with:
+
+- GitHub Actions
+- Docker Hub
+- Railway Deployments
+- Kubernetes
+
+---
+
+# 🗺 Roadmap
+
+## Completed
+
+- [x] AI-powered tutoring with Google Gemini
+- [x] Text question support
+- [x] Image understanding
+- [x] Voice message transcription
+- [x] Automatic subject detection
+- [x] Conversation memory
+- [x] PostgreSQL storage
+- [x] User statistics
+- [x] Feedback system
+- [x] Daily request limits
+- [x] Prometheus metrics
+- [x] Health check endpoint
+- [x] Docker deployment
+- [x] Railway deployment
+- [x] Embedded SQL migrations
+- [x] Graceful shutdown
+
+## Planned
+
+- [ ] Admin web dashboard
+- [ ] User authentication portal
+- [ ] Teacher dashboard
+- [ ] Multiple AI providers
+- [ ] OCR improvements
+- [ ] Streaming AI responses
+- [ ] Export conversation history
+- [ ] Multi-language interface
+- [ ] Unit & Integration tests
+- [ ] GitHub Actions CI/CD
+
+---
+
+# 💡 Engineering Challenges
+
+During development several engineering problems had to be solved.
+
+### Multi-modal AI
+
+The bot supports three completely different input types:
+
+- Text
+- Images
+- Voice messages
+
+Each follows a different processing pipeline before reaching the AI model.
+
+---
+
+### Subject-aware prompting
+
+Instead of using a single generic prompt, the bot first classifies the subject (Mathematics, Physics, Biology, etc.) and then applies specialized prompts to improve answer quality.
+
+---
+
+### Telegram limitations
+
+Telegram imposes several constraints:
+
+- Maximum message length
+- Markdown parsing
+- File uploads
+- Voice message handling
+
+The project implements dedicated utilities to safely format and split long responses.
+
+---
+
+### Production deployment
+
+The application was designed to run continuously in production using:
+
+- Docker
+- Railway
+- PostgreSQL
+- Prometheus
+
+with health checks and graceful shutdown support.
+
+---
+
+# 📚 Lessons Learned
+
+Building AI Ustaz significantly improved my knowledge in:
+
+- Go application architecture
+- Modular project organization
+- PostgreSQL schema design
+- Telegram Bot API
+- AI prompt engineering
+- Google Gemini integration
+- OpenAI Speech-to-Text
+- Docker deployment
+- Monitoring with Prometheus
+- Production logging
+- Environment configuration
+- Dependency management
+
+---
+
+# 🤝 Contributing
+
+Contributions, ideas, bug reports, and feature requests are welcome.
+
+Feel free to open an issue or submit a pull request.
+
+---
+
+# 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+# 👨‍💻 Author
+
+**Bekzat Tursun**
+
+Backend Software Engineer
+
+GitHub
+
+https://github.com/cobrich
+
+LinkedIn
+
+https://linkedin.com/in/tursunbekzat
+
+Email
+
+tursunbekzat07@gmail.com
+
+---
+
+<div align="center">
+
+⭐ If you found this project interesting, consider giving it a star.
+
+Built with ❤️ using Go, Google Gemini and OpenAI.
+
+</div>
