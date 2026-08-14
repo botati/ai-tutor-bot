@@ -1,1 +1,1 @@
-worker: bin/ai-tutor-bot
+worker: bin/bot
